@@ -28,7 +28,10 @@ private:
     //add your methods here
     //seperate thread for each client will run this method
     void client_handle(int fd);
-    bool processData(string incomingData, int fd, string &incompleteLine, bool havingEndLine);
+    bool processData(string incomingData, int fd, string &incompleteLine);
+    void processSet(string str, int fd);
+    void processGet(string str, int fd);
+    void processQuit(int fd);
 };
 
 }

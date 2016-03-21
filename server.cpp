@@ -67,147 +67,102 @@ namespace EpochLabsTest {
         return peer_fd;
     }
 
-bool Server::processData(string incomingData, int fd, string &incompleteLine, bool havingEndLine){
-    //string incompleteLine = "";
+void Server::processSet(string str, int fd){
+    //cout<<"inside set"<<endl;
     char buf[1024];
-    int quit = 0; //flag to indicate that quit request is received
-    havingEndLine = false;
-    cout<<havingEndLine;    
-    cout<<"##### RECEIVED LINE ######\n"+incomingData<<endl<<endl;
-                        //check whether the incoming data has "\n" or not
-    if(incomingData.find_first_of("\n")==string::npos) 
+    str = str.substr(str.find_first_of(" ")+1);
+    ////cout<<"key value pair"<<str<<endl;
+    string key = str.substr(0,str.find_first_of(" ")); //extracting the key
+    //cout<<"\nkey is "<<key<<endl;
+    str = str.substr(str.find_first_of(" ")+1);
+    string val = str;//str.substr(0,str.find_first_of("\n"));   ///////////////
+    //cout<<"\nval is "<<val<<endl;
+    
+    //acquiring write lock
+    pthread_rwlock_wrlock(&rwlock);
+    key_val[key] = val;
+    pthread_rwlock_unlock(&rwlock); //releasing the lock
+    
+    //setting the response
+    string rsp = key + '=' + val + '\n';
+    
+    //send the response for set command back to the client
+    for(unsigned int i = 0; i < rsp.size(); i++)
+    buf[i] = rsp[i];
+    ////cout<<"\nresponse is "<<rsp<<endl;
+    send(fd, buf,rsp.size(), 0);
+}
+
+void Server::processGet(string str, int fd){
+    //cout<<"inside get"<<endl;
+    char buf[1024];
+    str = str.substr(str.find_first_of(" ")+1);
+    //str = str.substr(0,str.find_first_of("\n"));      ///////////////////////////
+    //cout<<"\nkey is "<<str<<endl;
+    
+    //acquiring read lock
+    pthread_rwlock_rdlock(&rwlock);
+    unordered_map<string, string>::iterator it = key_val.find(str);
+    //setting the response
+    string rsp;
+    if(it == key_val.end())
     {
-        //add the incoming data to incompleteLine variable to be used on later and to handle poor pipelining
-        incompleteLine += incomingData;
-        cout<<"incomplete line "+incompleteLine<<endl;
+        rsp = str + "=null\n";
     }
     else
     {
-        //cout<<"\n incoming string length "<<incomingData.size()<<endl;
-        //cout<<"\n incoming string "<<incomingData<<endl;
-        cout<<"incoming line"+incomingData<<endl;
-        //bool doesNotHaveNewLine = false;
-        string str;
-        //check if the incoming is just "\n", if yes then set str as incompleteLine to be processed
-        if(incomingData=="\n"){
-            str = incompleteLine;
+        rsp = str + '=' + key_val[str] + '\n';
+    }
+    
+    pthread_rwlock_unlock(&rwlock); //releaseing the read lock
+    
+    //send the response for get command back to client
+    //cout<<"Response from get is "+rsp<<endl;
+    for(unsigned int i = 0; i < rsp.size(); i++)
+    buf[i] = rsp[i];
+    
+    ////cout<<"\nresponse is "<<rsp<<endl;
+    
+    send(fd, buf,rsp.size(), 0);
+}
+
+void Server::processQuit(int fd){
+    //cout<<"inside quit"<<endl;
+    close(fd);
+}
+
+bool Server::processData(string incomingData, int fd, string &incompleteLine){
+    //string incompleteLine = "";
+    int quit = 0; //flag to indicate that quit request is received  
+    //cout<<"##### RECEIVED LINE ######\n"+incomingData<<endl;
+    //cout<<"incompleteLine "+incompleteLine<<endl;
+    incomingData = incompleteLine+incomingData;
+    incompleteLine = "";
+    while(incomingData.find("\n")!=string::npos){
+        string command = incomingData.substr(0,incomingData.find_first_of("\n"));
+        incomingData = incomingData.substr(incomingData.find_first_of("\n")+1);
+        if(command.find("set")!=string::npos){
+            //process set command
+            //cout<<"calling set func 1"<<endl;
+            processSet(command,fd);
             incompleteLine = "";
         }
-        else{
-            str = incomingData.substr(0, incomingData.find_first_of("\n")); 
-            incomingData = incomingData.substr(incomingData.find_first_of("\n") + 1);       /////////////////////////////////
-        
-        }
-        //if there is some incompleteLine then add it before the streaming data to be processed
-        //if((str.find_first_of(" ")!=string::npos) and (str.substr(0,str.find_first_of(" ")) != "set" or str.substr(0,str.find_first_of(" ")) != "get") and (str!="quit")){
-        if(incompleteLine.size()!=0){
-            str = incompleteLine+str;
+        else if(command.find("get")!=string::npos){
+            //process get command
+            //cout<<"calling get func 2"<<endl;
+            processGet(command,fd);
             incompleteLine = "";
-        }   
-        
-        while(str != "")
-        { 
-                    //processing set commands
-             if((str.substr(0,str.find_first_of(" "))) == "set")
-             {
-                str = str.substr(str.find_first_of(" ")+1);
-                //cout<<"key value pair"<<str<<endl;
-                string key = str.substr(0,str.find_first_of(" ")); //extracting the key
-                cout<<"\nkey is "<<key<<endl;
-                str = str.substr(str.find_first_of(" ")+1);
-                string val = str;//str.substr(0,str.find_first_of("\n"));   ///////////////
-                cout<<"\nval is "<<val<<endl;
-                
-                //acquiring write lock
-                pthread_rwlock_wrlock(&rwlock);
-                key_val[key] = val;
-                pthread_rwlock_unlock(&rwlock); //releasing the lock
-                
-                //setting the response
-                string rsp = key + '=' + val + '\n';
-                
-                //send the response for set command back to the client
-                for(unsigned int i = 0; i < rsp.size(); i++)
-                buf[i] = rsp[i];
-                //cout<<"\nresponse is "<<rsp<<endl;
-                send(fd, buf,rsp.size(), 0);
-             }
-             //processing get commands
-             else if((str.substr(0,str.find_first_of(" "))) == "get")
-             {
-                str = str.substr(str.find_first_of(" ")+1);
-                //str = str.substr(0,str.find_first_of("\n"));      ///////////////////////////
-                cout<<"\nkey is "<<str<<endl;
-                
-                //acquiring read lock
-                pthread_rwlock_rdlock(&rwlock);
-                unordered_map<string, string>::iterator it = key_val.find(str);
-                //setting the response
-                string rsp;
-                if(it == key_val.end())
-                {
-                    rsp = str + "=null\n";
-                }
-                else
-                {
-                    rsp = str + '=' + key_val[str] + '\n';
-                }
-                
-                pthread_rwlock_unlock(&rwlock); //releaseing the read lock
-                
-                //send the response for get command back to client
-                cout<<"Response from get is "+rsp<<endl;
-                for(unsigned int i = 0; i < rsp.size(); i++)
-                buf[i] = rsp[i];
-                
-                //cout<<"\nresponse is "<<rsp<<endl;
-                
-                send(fd, buf,rsp.size(), 0);
-                
-             }
-             //processing quit commands
-             else if(str=="quit")
-             {
-                 //closing the connection
-                close(fd);
-                quit = 1;
-                break;  
-             }
-             //if the incoming line is not of type "set", "get" or "quit" then handling it by preparing input for next iteration using incompleteLine
-             else
-             {
-                str = incompleteLine+str;
-                incompleteLine = "";
-                continue;
-             }
-             
-               
-           if(incomingData=="")
-           {
-                str = "";
-           }
-           else
-           {
-           //prepare str and incomingData to handle next command
-                if(incomingData.find_first_of("\n")==string::npos)
-                {    
-                    if(incompleteLine.size()==0)
-                    {
-                        incompleteLine += incomingData;
-                        str = "";
-                    }
-                    else
-                    {    
-                        str = incompleteLine +incomingData;
-                        incompleteLine = "";
-                    }
-                }
-                else
-                    str = incomingData.substr(0, incomingData.find_first_of("\n"));
-                incomingData = incomingData.substr(incomingData.find_first_of("\n")+1);               ////////////////////////////////               
-            }
         }
-     }
+        else if(command.find("quit")!=string::npos){
+            //process quit command
+            //cout<<"calling quit func 3"<<endl;
+            processQuit(fd);
+            incompleteLine = "";
+        }
+    }
+    if(incomingData.size()!=0){
+        incompleteLine = incomingData;
+    }
     //exit from thread
     if(quit == 1)
         return true;
@@ -218,6 +173,7 @@ bool Server::processData(string incomingData, int fd, string &incompleteLine, bo
     void Server::client_handle(int fd)
     {
         string incompleteLine = "";
+
         while(true)
         {
             char buf[1024];
@@ -227,19 +183,16 @@ bool Server::processData(string incomingData, int fd, string &incompleteLine, bo
             for(int i = 0; i < len; i++)
             {
                 incomingData = incomingData + buf[i];
-                if(buf[i]=='\n'){
-                    if(processData(incomingData, fd, incompleteLine, true)){
-                        breakFlag = true;
-                    }
-                    incomingData = "";
-                }
             }
-            if(incomingData.size()!=0){
-                if(processData(incomingData, fd, incompleteLine, false)){
+            if(incomingData.find_first_of("\n")==string::npos){
+                incompleteLine += incomingData;
+            }
+            else{
+                if(processData(incomingData, fd, incompleteLine)){
                     breakFlag = true;
                 }
             }
-            cout<<"INCOMPLETE LINE "+incompleteLine<<endl;
+            ////cout<<"INCOMPLETE LINE "+incompleteLine<<endl;
             //output the data received from the socket
             if(breakFlag)
                 break;        

@@ -13,7 +13,7 @@ logger = logging.getLogger()
 
 PROG_PATH = './server'
 LIST_ADDR = '127.0.0.1'
-LIST_PORT = '2025'
+LIST_PORT = '2034'
 
 class EpochAPI(object):
     def __init__(self, addr, port):
@@ -101,7 +101,8 @@ class MyTests(unittest.TestCase):
         self.api0 = EpochAPI(LIST_ADDR,LIST_PORT)
         self.api1 = EpochAPI(LIST_ADDR,LIST_PORT)
         set0 = "set aman"
-        set1 = " zhil\n"
+        set1 = " zhil"
+        val = "\n"
         get0 = "get "
         get1 = "aman"
         self.api0._send(set0)
@@ -109,8 +110,8 @@ class MyTests(unittest.TestCase):
         self.api0.assert_get('aman', 'null')
         self.api0._send(set1)
         self.api0._send(get0)
-        self.api0._send(get1)
-        print self.api0.recv_msg()   
+        self.api0._send(get1+val)
+        self.api0.recv_msg()   
 
 class TestServer(unittest.TestCase):
     def setUp(self):
