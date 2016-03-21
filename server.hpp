@@ -27,7 +27,7 @@ private:
     void throw_error(const char* msg_, int errno_);
     //add your methods here
     //seperate thread for each client will run this method
-    void client_handle(int fd);
+    void client(int fd);
     bool processData(string incomingData, int fd, string &incompleteLine);
 };
 

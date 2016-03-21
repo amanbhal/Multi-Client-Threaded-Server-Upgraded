@@ -13,7 +13,7 @@ logger = logging.getLogger()
 
 PROG_PATH = './server'
 LIST_ADDR = '127.0.0.1'
-LIST_PORT = '2034'
+LIST_PORT = '2010'
 
 class EpochAPI(object):
     def __init__(self, addr, port):
@@ -81,38 +81,6 @@ class EpochAPI(object):
             self.send_get(t[0], t[1])
         self.assert_multi_response(tuples)
 
-class MyTests(unittest.TestCase):
-    def launch(self):
-        logger.debug("launching server")
-        self.prog_out = open('server.log', 'a+')
-        self.prog_out.truncate()
-        self.p = subprocess.Popen([PROG_PATH, LIST_ADDR, LIST_PORT], stdout=self.prog_out, stderr=self.prog_out)
-        while self.p.poll() == None:
-            with open('server.log', 'r') as log:
-                if 'listening on %s:%s' % (LIST_ADDR, LIST_PORT) in log.read().splitlines():
-                    break
-                time.sleep(0.1)
-                if self.p.poll() != None:
-                    raise Exception('server failed to start')
-        logger.debug('server started')
-    
-    def custom_test(self):
-        self.launch()
-        self.api0 = EpochAPI(LIST_ADDR,LIST_PORT)
-        self.api1 = EpochAPI(LIST_ADDR,LIST_PORT)
-        set0 = "set aman"
-        set1 = " zhil"
-        val = "\n"
-        get0 = "get "
-        get1 = "aman"
-        self.api0._send(set0)
-        self.api1.assert_get('aman', 'null')
-        self.api0.assert_get('aman', 'null')
-        self.api0._send(set1)
-        self.api0._send(get0)
-        self.api0._send(get1+val)
-        self.api0.recv_msg()   
-
 class TestServer(unittest.TestCase):
     def setUp(self):
         self.launch()
@@ -160,28 +128,23 @@ class TestServer(unittest.TestCase):
         assert self.p.poll() == None
         
     def test_empty_quit(self):
-        print 1
         self.api1.assert_quit()
         self.api0.assert_quit()
 
     def test_empty_disconnect(self):
-        print 2
         self.assert_disconnect(self.api1)
         self.assert_disconnect(self.api0)
 
     def test_disconnect_after_set(self):
-        print 3
         self.api0.assert_set('a'*100, 'b'*100)
         self.assert_disconnect(self.api0)
 
     def test_disconnect_after_get(self):
-        print 4
         self.api0.assert_set('a'*500, 'b'*500)
         self.api0.assert_get('a'*500, 'b'*500)
         self.assert_disconnect(self.api0)
 
     def test_example_session(self):
-        print 5
         self.api0.assert_set('foo', 'bar')
         self.api0.assert_get('foo', 'bar')
         self.api0.assert_get('bar', 'null')
@@ -195,7 +158,6 @@ class TestServer(unittest.TestCase):
         self.api0.assert_quit()
 
     def test_pipeline(self):
-        print 6
         reqs = [
             ('get', 'k0'),
             ('set', 'k1', 'v1'),
@@ -222,21 +184,19 @@ class TestServer(unittest.TestCase):
         self.api0.assert_get('k2', 'val2')
 
     def test_poor_pipeline_alignment(self):
-        print 7
         self.api0.assert_get('foo', 'null')
         self.api0.assert_get('bar', 'null')
-        part0 = 'set bar b'
+        part0 = 'set foo bar\nset bar b'
         part1 = 'az\n'
         self.api0._send(part0)
-        #self.api0.assert_recv_msg('foo', 'bar')
-        self.api1.assert_get('foo', 'null')
+        self.api0.assert_recv_msg('foo', 'bar')
+        self.api1.assert_get('foo', 'bar')
         self.api1.assert_get('bar', 'null')
         self.api0._send(part1)
         self.api0.assert_recv_msg('bar', 'baz')
         self.api0.assert_get('bar', 'baz')
 
     def test_threaded_pipeline(self):
-        print 8
         v = lambda i: ('val%s' % i)*(i%100+1)
 
         def write_target(api, count):
@@ -264,7 +224,6 @@ class TestServer(unittest.TestCase):
         self.api1.assert_get('k', 'pipeline')
 
     def test_tarpit(self):
-        print 9
         self.api0._send('s')
         time.sleep(0.25)
         self.api0._send('e')
@@ -282,7 +241,6 @@ class TestServer(unittest.TestCase):
         self.api0._send('\n')
 
     def test_multi_connection_partial_tarpit(self):
-        print 10
         self.api0.assert_get('tar', 'null')
         self.api1.assert_get('tar', 'null')
         self.api0._send('s')
@@ -310,7 +268,6 @@ class TestServer(unittest.TestCase):
         self.api1.assert_recv_msg('tar', 'pit')
 
     def test_multi_connection_tarpit(self):
-        print 11
         apis = []
         for i in range(10):
             api = EpochAPI(LIST_ADDR, LIST_PORT)
@@ -346,7 +303,6 @@ class TestServer(unittest.TestCase):
             a.assert_quit()
 
     def test_cross_connection_xfer(self):
-        print 12
         self.api0.assert_get('foo', 'null')
         self.api1.assert_get('foo', 'null')
         self.api0.assert_set('foo', 'bar')
@@ -355,7 +311,6 @@ class TestServer(unittest.TestCase):
         self.api0.assert_get('foo', 'baz')
 
     def test_reconnect(self):
-        print 13
         self.api0.assert_get('foo', 'null')
         self.api0.assert_set('foo', 'bar')
         self.api0.assert_quit()
@@ -363,7 +318,6 @@ class TestServer(unittest.TestCase):
         self.api0.assert_set('foo', 'bar')
 
     def test_many_keys(self):
-        print 14
         k = lambda i: 'key%s' % i
         v = lambda i: '%sval' % i
 
@@ -373,7 +327,6 @@ class TestServer(unittest.TestCase):
             a1.assert_get(k(i), v(i))
 
     def test_multi_threaded(self):
-        print 15
         def mk_key(tid, reqid):
             return '%sK%s' % (tid, reqid)
 

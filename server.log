@@ -1,6 +1,6 @@
-using addr=127.0.0.1 port=2034
+using addr=127.0.0.1 port=2010
 creating server
-listening on 127.0.0.1:2034
+listening on 127.0.0.1:2010
 running ...
 accepted connection, peer_fd=5
 accepted connection, peer_fd=6

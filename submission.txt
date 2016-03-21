@@ -20,8 +20,26 @@ BUG_REPORT_URL="http://bugs.launchpad.net/ubuntu/"
 g++ (Ubuntu 4.8.4-2ubuntu1~14.04.1) 4.8.4
 
 
+###### NAME & EMAIL-ID ######
+
 Name: Amandeep Singh Bhal
 Email Id: amandeep.bhal92@tamu.edu
 
 
+####### NOTES ###############
 
+An unordered_map is used to hold key value pairs. It will reduce the retrieval of key value pair to O(1) time complexity. Set and Get commands will run in O(1) time complexity.
+
+A method, to handle each client request, named "client" is implemented inside server.cpp file.
+
+Incoming data stream from each client is broken into two parts: incompleteLine and incomingData.
+
+incompleteLine holds the data that does not make a full command.
+
+incomingData holds everything that is coming from a single client. It may contain single incomplete command, single complete command, multiple complete commands, multiple commands with one incomplete command.
+
+processData method takes incomingData, incompleteLine and fd as parameters and processes the data to handle set, get and quit commands.
+
+This project will handle multiple clients on a single server, where each client sends synchronized data e.g. it will send complete set command before sending the get or quit command. The scope of the project can be increased such that the server can also handle unsynchronized client e.g a client can send get request before completing set request. This functionality can be achieved by slightly changing the way we send a request. If we also send a identifier with each request than will determine that the current request is a set request or a get request or a quit request then we will be able to achieve the desired functionality.
+
+It was an interesting project and I loved working on it. Thanks for the opportunity.

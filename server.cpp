@@ -167,7 +167,7 @@ bool Server::processData(string incomingData, int fd, string &incompleteLine){
 }
 
 //method to handle each client connection
-    void Server::client_handle(int fd)
+    void Server::client(int fd)
     {
         // variable to hold incomplete commands
         string incompleteLine = "";
@@ -213,7 +213,7 @@ bool Server::processData(string incomingData, int fd, string &incompleteLine){
     	while(true)
     	{
     	    int fd = accept_new_connection();
-    	    thread t(&Server::client_handle, this, fd); //seperate thread for each connection
+    	    thread t(&Server::client, this, fd); //seperate thread for each connection
     	    t.detach(); //detaching the thread execution to run the thread independently
     	    
     	    
