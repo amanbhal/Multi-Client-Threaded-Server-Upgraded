@@ -67,133 +67,135 @@ namespace EpochLabsTest {
         return peer_fd;
     }
 
-void Server::processSet(string str, int fd){
-    //cout<<"inside set"<<endl;
-    char buf[1024];
-    str = str.substr(str.find_first_of(" ")+1);
-    ////cout<<"key value pair"<<str<<endl;
-    string key = str.substr(0,str.find_first_of(" ")); //extracting the key
-    //cout<<"\nkey is "<<key<<endl;
-    str = str.substr(str.find_first_of(" ")+1);
-    string val = str;//str.substr(0,str.find_first_of("\n"));   ///////////////
-    //cout<<"\nval is "<<val<<endl;
-    
-    //acquiring write lock
-    pthread_rwlock_wrlock(&rwlock);
-    key_val[key] = val;
-    pthread_rwlock_unlock(&rwlock); //releasing the lock
-    
-    //setting the response
-    string rsp = key + '=' + val + '\n';
-    
-    //send the response for set command back to the client
-    for(unsigned int i = 0; i < rsp.size(); i++)
-    buf[i] = rsp[i];
-    ////cout<<"\nresponse is "<<rsp<<endl;
-    send(fd, buf,rsp.size(), 0);
-}
-
-void Server::processGet(string str, int fd){
-    //cout<<"inside get"<<endl;
-    char buf[1024];
-    str = str.substr(str.find_first_of(" ")+1);
-    //str = str.substr(0,str.find_first_of("\n"));      ///////////////////////////
-    //cout<<"\nkey is "<<str<<endl;
-    
-    //acquiring read lock
-    pthread_rwlock_rdlock(&rwlock);
-    unordered_map<string, string>::iterator it = key_val.find(str);
-    //setting the response
-    string rsp;
-    if(it == key_val.end())
-    {
-        rsp = str + "=null\n";
-    }
-    else
-    {
-        rsp = str + '=' + key_val[str] + '\n';
-    }
-    
-    pthread_rwlock_unlock(&rwlock); //releaseing the read lock
-    
-    //send the response for get command back to client
-    //cout<<"Response from get is "+rsp<<endl;
-    for(unsigned int i = 0; i < rsp.size(); i++)
-    buf[i] = rsp[i];
-    
-    ////cout<<"\nresponse is "<<rsp<<endl;
-    
-    send(fd, buf,rsp.size(), 0);
-}
-
-void Server::processQuit(int fd){
-    //cout<<"inside quit"<<endl;
-    close(fd);
-}
 
 bool Server::processData(string incomingData, int fd, string &incompleteLine){
-    //string incompleteLine = "";
-    int quit = 0; //flag to indicate that quit request is received  
-    //cout<<"##### RECEIVED LINE ######\n"+incomingData<<endl;
-    //cout<<"incompleteLine "+incompleteLine<<endl;
+    //flag to indicate that quit request is received  
+    int quit = 0;
+
+                    //cout<<"##### RECEIVED LINE ######\n"+incomingData<<endl;
+                    //cout<<"incompleteLine "+incompleteLine<<endl;
+    
+    //append the previous incomplete data with incomingData to make it complete and process it.
     incomingData = incompleteLine+incomingData;
     incompleteLine = "";
+
+    //process data while it contains "\n"
     while(incomingData.find("\n")!=string::npos){
-        string command = incomingData.substr(0,incomingData.find_first_of("\n"));
+        string str = incomingData.substr(0,incomingData.find_first_of("\n"));
         incomingData = incomingData.substr(incomingData.find_first_of("\n")+1);
-        if(command.find("set")!=string::npos){
-            //process set command
-            //cout<<"calling set func 1"<<endl;
-            processSet(command,fd);
+        //process set command
+        if(str.find("set")!=string::npos){
+            char buf[1024];
+            str = str.substr(str.find_first_of(" ")+1);
+                    ////cout<<"key value pair"<<str<<endl;
+
+            //extracting the key
+            string key = str.substr(0,str.find_first_of(" "));
+                    //cout<<"\nkey is "<<key<<endl;
+            str = str.substr(str.find_first_of(" ")+1);
+            string val = str;
+                    //cout<<"\nval is "<<val<<endl;
+            
+            //acquiring write lock
+            pthread_rwlock_wrlock(&rwlock);
+            key_val[key] = val;
+            //releasing the lock
+            pthread_rwlock_unlock(&rwlock);
+            
+            //setting the response
+            string rsp = key + '=' + val + '\n';
+            
+            //send the response for set command back to the client
+            for(unsigned int i = 0; i < rsp.size(); i++)
+            buf[i] = rsp[i];
+                    ////cout<<"\nresponse is "<<rsp<<endl;
+            send(fd, buf,rsp.size(), 0);
             incompleteLine = "";
         }
-        else if(command.find("get")!=string::npos){
-            //process get command
-            //cout<<"calling get func 2"<<endl;
-            processGet(command,fd);
+        //process get command
+        else if(str.find("get")!=string::npos){
+            char buf[1024];
+            str = str.substr(str.find_first_of(" ")+1);
+                    //cout<<"\nkey is "<<str<<endl;
+            
+            //acquiring read lock
+            pthread_rwlock_rdlock(&rwlock);
+            unordered_map<string, string>::iterator it = key_val.find(str);
+            
+            //setting the response
+            string rsp;
+            if(it == key_val.end())
+            {
+                rsp = str + "=null\n";
+            }
+            else
+            {
+                rsp = str + '=' + key_val[str] + '\n';
+            }
+            //releaseing the read lock
+            pthread_rwlock_unlock(&rwlock);
+            
+            //send the response for get command back to client
+                    //cout<<"Response from get is "+rsp<<endl;
+            for(unsigned int i = 0; i < rsp.size(); i++)
+            buf[i] = rsp[i];
+            
+                    ////cout<<"\nresponse is "<<rsp<<endl;
+            
+            send(fd, buf,rsp.size(), 0);
+
             incompleteLine = "";
         }
-        else if(command.find("quit")!=string::npos){
-            //process quit command
-            //cout<<"calling quit func 3"<<endl;
-            processQuit(fd);
-            incompleteLine = "";
+        //process quit command
+        else if(str.find("quit")!=string::npos){
+            close(fd);
+            //set quit flag
+            quit = 1;
         }
     }
+
+    //if there is any incoming data left to process then that is will be processed later and it is set in incompleteLine
     if(incomingData.size()!=0){
         incompleteLine = incomingData;
     }
-    //exit from thread
+
+    //return whether the quit command was received or not
     if(quit == 1)
         return true;
     else
         return false;
 }
-//thread function to handle each client connection
+
+//method to handle each client connection
     void Server::client_handle(int fd)
     {
+        // variable to hold incomplete commands
         string incompleteLine = "";
 
         while(true)
         {
             char buf[1024];
-            string incomingData = ""; //to hold the data coming from socket
+            //to hold the data coming from socket
+            string incomingData = "";
             int len = recv(fd, buf, 1024, 0); 
             bool breakFlag = false;
             for(int i = 0; i < len; i++)
             {
                 incomingData = incomingData + buf[i];
             }
+            //if incomingData does not have any "\n" therefore the commands are not complete therefore update incompleteLine variable
             if(incomingData.find_first_of("\n")==string::npos){
                 incompleteLine += incomingData;
             }
+            //if incomingData has atleast one "\n" then send data for processing
             else{
                 if(processData(incomingData, fd, incompleteLine)){
                     breakFlag = true;
                 }
             }
-            ////cout<<"INCOMPLETE LINE "+incompleteLine<<endl;
-            //output the data received from the socket
+                        ////cout<<"INCOMPLETE LINE "+incompleteLine<<endl;
+
+            //if quit command has been issued then break quit receiving more data and kill the thread
             if(breakFlag)
                 break;        
         }
